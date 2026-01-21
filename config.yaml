@@ -20,19 +20,19 @@ chains:
         decimals: 18
         monitor_mode: "exchange_deposit"  # 交易所充值模式
 
-  # 币安智能链
-  - name: BSC
-    chain_id: 56
-    explorer_api: "https://api.bscscan.com/v2/api"
-    explorer_url: "https://bscscan.com"
-    api_key_env: "ETHERSCAN_API_KEY"  # 使用同一个API Key（API V2）
-    tokens:
-      - name: River
-        symbol: RIVER
-        contract: "0xdA7AD9dea9397cffdDAE2F8a052B82f1484252B3"
-        coingecko_id: "river"
-        decimals: 18
-        monitor_mode: "whale_transfer"  # 巨鲸转账模式
+  # 币安智能链 (需要付费API计划才能使用)
+  # - name: BSC
+  #   chain_id: 56
+  #   explorer_api: "https://api.bscscan.com/v2/api"
+  #   explorer_url: "https://bscscan.com"
+  #   api_key_env: "ETHERSCAN_API_KEY"
+  #   tokens:
+  #     - name: River
+  #       symbol: RIVER
+  #       contract: "0xdA7AD9dea9397cffdDAE2F8a052B82f1484252B3"
+  #       coingecko_id: "river"
+  #       decimals: 18
+  #       monitor_mode: "whale_transfer"
 
 # 交易所名称关键字（仅用于exchange_deposit模式）
 exchanges:
