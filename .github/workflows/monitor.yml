@@ -9,6 +9,8 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 允许推送提交
 
     steps:
       - name: Checkout repository
