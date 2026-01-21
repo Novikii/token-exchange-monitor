@@ -84,15 +84,37 @@ def get_token_transfers(
 ) -> List[dict]:
     """
     获取代币转账记录
-    使用Etherscan API: module=account&action=tokentx
+    使用Etherscan API: module=logs&action=getLogs
+    监控Transfer事件: Transfer(address,address,uint256)
     """
+    # 获取最新区块号
+    try:
+        block_response = requests.get(
+            api_url,
+            params={
+                'module': 'proxy',
+                'action': 'eth_blockNumber',
+                'apikey': api_key
+            },
+            timeout=10
+        )
+        latest_block = int(block_response.json()['result'], 16)
+        from_block = latest_block - 500  # 查询最近500个区块（约2小时）
+    except Exception as e:
+        logger.error(f"Failed to get block number: {e}")
+        from_block = 0
+
+    # Transfer事件的topic0
+    # Transfer(address indexed from, address indexed to, uint256 value)
+    transfer_topic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
     params = {
-        'module': 'account',
-        'action': 'tokentx',
-        'contractaddress': contract_address,
-        'page': page,
-        'offset': offset,
-        'sort': 'desc',  # 最新的在前
+        'module': 'logs',
+        'action': 'getLogs',
+        'address': contract_address,
+        'fromBlock': from_block,
+        'toBlock': 'latest',
+        'topic0': transfer_topic,
         'apikey': api_key
     }
 
@@ -102,11 +124,35 @@ def get_token_transfers(
         data = response.json()
 
         if data['status'] == '1' and data['message'] == 'OK':
-            return data['result']
-        elif data['status'] == '0' and data['message'] == 'No transactions found':
+            # 转换logs格式为类似tokentx的格式
+            transfers = []
+            for log in data['result']:
+                # 解析log数据
+                # topics[1] = from address (padded to 32 bytes)
+                # topics[2] = to address (padded to 32 bytes)
+                # data = value (hex)
+                if len(log['topics']) >= 3:
+                    from_addr = '0x' + log['topics'][1][-40:]  # 取最后40个字符
+                    to_addr = '0x' + log['topics'][2][-40:]
+                    value = log['data']  # hex value
+
+                    transfers.append({
+                        'hash': log['transactionHash'],
+                        'from': from_addr,
+                        'to': to_addr,
+                        'value': str(int(value, 16)),  # 转为十进制字符串
+                        'timeStamp': str(int(log['timeStamp'], 16))
+                    })
+
+            # 按时间倒序排序，返回最近的N条
+            transfers.sort(key=lambda x: int(x['timeStamp']), reverse=True)
+            return transfers[:offset]
+
+        elif data['status'] == '0' and 'No records found' in data.get('message', ''):
             return []
         else:
-            logger.error(f"API error: {data['message']}")
+            logger.error(f"API error: {data.get('message', 'Unknown error')}")
+            logger.debug(f"API response: {data}")
             return []
 
     except requests.RequestException as e:
