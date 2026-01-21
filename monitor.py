@@ -79,6 +79,7 @@ def get_token_transfers(
     contract_address: str,
     api_key: str,
     api_url: str,
+    chain_name: str = "Ethereum",
     page: int = 1,
     offset: int = 100
 ) -> List[dict]:
@@ -87,26 +88,20 @@ def get_token_transfers(
     使用Etherscan API: module=logs&action=getLogs
     监控Transfer事件: Transfer(address,address,uint256)
     """
-    # 获取最新区块号
-    try:
-        block_response = requests.get(
-            api_url,
-            params={
-                'module': 'proxy',
-                'action': 'eth_blockNumber',
-                'apikey': api_key
-            },
-            timeout=10
-        )
-        latest_block = int(block_response.json()['result'], 16)
-        from_block = latest_block - 500  # 查询最近500个区块（约2小时）
-    except Exception as e:
-        logger.error(f"Failed to get block number: {e}")
-        from_block = 0
-
     # Transfer事件的topic0
     # Transfer(address indexed from, address indexed to, uint256 value)
     transfer_topic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
+    # 根据不同链设置合适的起始区块（查询最近几天的数据）
+    # 每10分钟运行一次，覆盖最近一周的数据足够
+    start_blocks = {
+        'Ethereum': 21400000,  # 2026年1月，约1周前
+        'BSC': 45900000,       # 2026年1月，约1周前
+        'Polygon': 66000000,   # 预留
+        'Arbitrum': 290000000  # 预留
+    }
+
+    from_block = start_blocks.get(chain_name, 0)
 
     params = {
         'module': 'logs',
@@ -382,6 +377,7 @@ def main():
                 contract_address=token['contract'],
                 api_key=api_key,
                 api_url=chain['explorer_api'],
+                chain_name=chain['name'],
                 offset=100  # 获取最近100笔交易
             )
 
