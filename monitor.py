@@ -392,6 +392,7 @@ def main():
 
             # 3.3 过滤和处理交易
             notified_count = 0
+            above_threshold_count = 0
 
             for tx in transfers:
                 # 构造唯一标识
@@ -414,6 +415,13 @@ def main():
                 if usd_value < config['usd_threshold']:
                     continue
 
+                # 记录超过阈值的交易
+                above_threshold_count += 1
+                logger.info(f"  💰 Large transfer: {amount:,.2f} {token['symbol']} (${usd_value:,.2f})")
+                logger.info(f"     From: {tx['from']}")
+                logger.info(f"     To: {tx['to']}")
+                logger.info(f"     Tx: {tx['hash'][:10]}...")
+
                 # 根据监控模式决定是否播报
                 should_notify = False
                 notification_type = None
@@ -425,6 +433,9 @@ def main():
                     to_label = exchange_addresses.get(tx['to'].lower())
                     from_label = exchange_addresses.get(tx['from'].lower())
 
+                    logger.info(f"     To label: {to_label or 'Unknown'}")
+                    logger.info(f"     From label: {from_label or 'Unknown'}")
+
                     # 检查是否匹配交易所充值
                     is_deposit, exchange_name = check_is_exchange_deposit(
                         tx['to'], to_label, from_label,
@@ -434,6 +445,9 @@ def main():
                     if is_deposit:
                         should_notify = True
                         notification_type = 'exchange_deposit'
+                        logger.info(f"     ✅ Matched: {exchange_name} deposit")
+                    else:
+                        logger.info(f"     ❌ Not an exchange deposit (skipped)")
 
                 elif token['monitor_mode'] == 'whale_transfer':
                     # 模式2: 所有大额转账都播报
@@ -483,6 +497,7 @@ def main():
                 # 避免发送过快
                 time.sleep(1)
 
+            logger.info(f"📊 Summary: {above_threshold_count} large transfers (>${config['usd_threshold']})")
             logger.info(f"✅ {token['symbol']}: {notified_count} notifications sent")
 
     # 4. 限制状态文件大小，只保留最近1000条
