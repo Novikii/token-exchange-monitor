@@ -189,9 +189,54 @@ def get_address_label_from_web(address: str, explorer_url: str) -> Optional[str]
     从区块链浏览器网页抓取地址标签
     注意：此方法有速率限制，仅作为备用方案
     """
-    # 简化实现：暂时返回None，依赖缓存库
-    # 完整实现需要HTML解析，这里不展开
-    return None
+    try:
+        url = f"{explorer_url}/address/{address}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        # 查找地址标签（Etherscan网页上的格式）
+        # 标签通常在 title 或特定的 span/div 中
+        content = response.text
+
+        # 尝试从页面标题中提取
+        # 格式: "Address 0x... | Etherscan" 或 "Label Name | Address 0x... | Etherscan"
+        import re
+
+        # 查找类似 "Binance: Deposit" 这样的标签
+        # 在Etherscan上，标签通常出现在地址旁边
+        patterns = [
+            r'<span[^>]*>([^<]+)</span>\s*</a>\s*<span[^>]*>\(' + re.escape(address.lower()[:10]),
+            r'title="([^"]+)"\s*href="[^"]*' + re.escape(address.lower()),
+            r'<title>([^|]+)\|[^|]+\| Etherscan</title>',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                label = match.group(1).strip()
+                # 排除纯地址的匹配
+                if label and not label.startswith('0x') and len(label) < 100:
+                    logger.debug(f"Found label for {address[:10]}...: {label}")
+                    return label
+
+        # 尝试查找 data-bs-title 或 data-original-title 属性（Etherscan新版）
+        title_pattern = r'data-bs-title="([^"]+)"[^>]*' + re.escape(address.lower()[:20])
+        match = re.search(title_pattern, content, re.IGNORECASE)
+        if match:
+            label = match.group(1).strip()
+            if label and not label.startswith('0x'):
+                logger.debug(f"Found label for {address[:10]}...: {label}")
+                return label
+
+        return None
+
+    except Exception as e:
+        logger.debug(f"Failed to fetch label for {address[:10]}...: {e}")
+        return None
 
 
 # ========== 地址标签识别模块 ==========
@@ -430,8 +475,24 @@ def main():
 
                 if token['monitor_mode'] == 'exchange_deposit':
                     # 模式1: 仅播报交易所充值
-                    to_label = exchange_addresses.get(tx['to'].lower())
-                    from_label = exchange_addresses.get(tx['from'].lower())
+                    to_addr_lower = tx['to'].lower()
+                    from_addr_lower = tx['from'].lower()
+
+                    # 获取或抓取to地址标签
+                    to_label = exchange_addresses.get(to_addr_lower)
+                    if not to_label:
+                        to_label = get_address_label_from_web(tx['to'], chain['explorer_url'])
+                        if to_label:
+                            exchange_addresses[to_addr_lower] = to_label
+                        time.sleep(0.5)  # 避免速率限制
+
+                    # 获取或抓取from地址标签
+                    from_label = exchange_addresses.get(from_addr_lower)
+                    if not from_label:
+                        from_label = get_address_label_from_web(tx['from'], chain['explorer_url'])
+                        if from_label:
+                            exchange_addresses[from_addr_lower] = from_label
+                        time.sleep(0.5)  # 避免速率限制
 
                     logger.info(f"     To label: {to_label or 'Unknown'}")
                     logger.info(f"     From label: {from_label or 'Unknown'}")
@@ -453,8 +514,24 @@ def main():
                     # 模式2: 所有大额转账都播报
                     should_notify = True
                     notification_type = 'whale_transfer'
-                    to_label = exchange_addresses.get(tx['to'].lower())
-                    from_label = exchange_addresses.get(tx['from'].lower())
+
+                    to_addr_lower = tx['to'].lower()
+                    from_addr_lower = tx['from'].lower()
+
+                    # 获取或抓取地址标签（用于展示，不影响播报）
+                    to_label = exchange_addresses.get(to_addr_lower)
+                    if not to_label:
+                        to_label = get_address_label_from_web(tx['to'], chain['explorer_url'])
+                        if to_label:
+                            exchange_addresses[to_addr_lower] = to_label
+                        time.sleep(0.5)
+
+                    from_label = exchange_addresses.get(from_addr_lower)
+                    if not from_label:
+                        from_label = get_address_label_from_web(tx['from'], chain['explorer_url'])
+                        if from_label:
+                            exchange_addresses[from_addr_lower] = from_label
+                        time.sleep(0.5)
 
                 if not should_notify:
                     continue
