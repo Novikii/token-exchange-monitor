@@ -1,0 +1,60 @@
+# Token Exchange Monitor Configuration
+# 代币交易所监控系统配置文件
+
+# 全局USD阈值
+usd_threshold: 5000  # $5,000 USD
+
+# 多链配置（Etherscan API V2统一密钥）
+chains:
+  # 以太坊主网
+  - name: Ethereum
+    chain_id: 1
+    explorer_api: "https://api.etherscan.io/api"
+    explorer_url: "https://etherscan.io"
+    api_key_env: "ETHERSCAN_API_KEY"
+    tokens:
+      - name: LayerZero
+        symbol: ZRO
+        contract: "0x6985884C4392D348587B19cb9eAAf157F13271cd"
+        coingecko_id: "layerzero"
+        decimals: 18
+        monitor_mode: "exchange_deposit"  # 交易所充值模式
+
+  # 币安智能链
+  - name: BSC
+    chain_id: 56
+    explorer_api: "https://api.bscscan.com/api"
+    explorer_url: "https://bscscan.com"
+    api_key_env: "ETHERSCAN_API_KEY"  # 使用同一个API Key（API V2）
+    tokens:
+      - name: River
+        symbol: RIVER
+        contract: "0xdA7AD9dea9397cffdDAE2F8a052B82f1484252B3"
+        coingecko_id: "river"
+        decimals: 18
+        monitor_mode: "whale_transfer"  # 巨鲸转账模式
+
+# 交易所名称关键字（仅用于exchange_deposit模式）
+exchanges:
+  - "Binance"
+  - "Bybit"
+  - "KuCoin"
+  - "OKX"
+  - "Coinbase"
+  - "HTX"
+  - "Gate.io"
+  - "Gate"
+  - "Kraken"
+  - "MEXC"
+
+# Deposit关键字（接收方标签必须包含其中之一）
+deposit_keywords:
+  - "Dep"
+  - "Deposit"
+
+# CoinGecko API配置
+coingecko_api_url: "https://api.coingecko.com/api/v3"
+
+# 网络配置
+request_timeout: 30  # 秒
+max_retries: 3       # 最大重试次数

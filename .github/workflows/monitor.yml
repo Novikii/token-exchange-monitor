@@ -1,0 +1,41 @@
+name: Token Exchange Monitor (Multi-Chain)
+
+on:
+  schedule:
+    # 每10分钟执行一次 (避免超出GitHub Actions免费额度)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run monitor script
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          LARK_WEBHOOK_URL: ${{ secrets.LARK_WEBHOOK_URL }}
+        run: |
+          python monitor.py
+
+      - name: Commit updated state
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add last_state.json exchange_addresses.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update monitoring state [skip ci]"
+          git push
