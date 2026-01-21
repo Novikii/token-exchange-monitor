@@ -79,13 +79,14 @@ def get_token_transfers(
     contract_address: str,
     api_key: str,
     api_url: str,
+    chain_id: int,
     chain_name: str = "Ethereum",
     page: int = 1,
     offset: int = 100
 ) -> List[dict]:
     """
     获取代币转账记录
-    使用Etherscan API: module=logs&action=getLogs
+    使用Etherscan API V2: module=logs&action=getLogs
     监控Transfer事件: Transfer(address,address,uint256)
     """
     # Transfer事件的topic0
@@ -104,6 +105,7 @@ def get_token_transfers(
     from_block = start_blocks.get(chain_name, 0)
 
     params = {
+        'chainid': chain_id,
         'module': 'logs',
         'action': 'getLogs',
         'address': contract_address,
@@ -377,6 +379,7 @@ def main():
                 contract_address=token['contract'],
                 api_key=api_key,
                 api_url=chain['explorer_api'],
+                chain_id=chain['chain_id'],
                 chain_name=chain['name'],
                 offset=100  # 获取最近100笔交易
             )
